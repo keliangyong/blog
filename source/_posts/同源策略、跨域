@@ -1,0 +1,80 @@
+#### 什么是同源策略
+* `协议名+域名+端口`就是源，三者都相同视为同源。
+* 不同源的客户端脚本在没有明确授权下，不能读写对方的资源（可引用js、css、png）。例：a.com域名下的js无法操作b.com域名下的对象。
+
+#### 什么是跨域？跨域的几种实现形式
+* 同源策略在保证web安全的同时，也降低了网站交互的灵活性；有些大网站因为文件多数据大所以文件可能放在不同的服务器上，那么就有了突破同源策略的限制，以达到交互数据的目的。**跨域就是指当域名不同时，我能够突破同源策略的限制去交互数据**。（协议和端口不同的话在前台是无法实现的）。
+* 跨域有以下几种实现形式：
+    * **降域**：对于有相同的后缀（就是域名开头不一样但后面是一样的）的两个源，可以使用`document.domain="域名后缀"`来改变自己的域名，这样就同源了！(两个源都要设置domain才可)一个域名可以往下降（降为后缀）但不能往上升，但降域后可以回复到原来的域名，测试图如下：
+![0_1462687799119_upload-fdf8da8b-fb59-4033-936c-cfecaf16303d](http://upload-images.jianshu.io/upload_images/1826139-57801b63bb4e89d0?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240) 
+    * **jsonp**：上一题提到不同源虽然不能读写，但可以引用js，关键点在这；我们可以让引用的js附带数据来调用我们预先定义的函数，而数据当作参数传入。例如：a和b两个网站约定好了一个函数名，当`a`用`src`引用b的`js`时，`b`中的这段`js`包含这个函数名并且在后面加个括号中间放入数据，从b的角度来看这段js只是`数据名（{json数据}）`，但是在a看来，你的那个数据名在我这是个函数啊，你还有括号和形参，然后在a中这个函数就被调用执行了，而b中的数据就被当作参数传入这个函数。
+    * **CORS：跨域资源共享**这是一个W3C标准，顾名思义它允许浏览器向跨源服务器发起`XMLHttpRequest请求`，和ajax同源的使用方法一致（区别在于对于跨域请求浏览器的请求会有附加的相关设置，用户看不到），分简单请求和非简单请求。目前所有浏览器都支持（IE需要10及以上才完全支持）CORS，但是需要服务器端有CORS接口，且要有服务器许可的源才可实现跨域资源共享。
+    * **[HTML5]postMessage**：在HTML5中，window增加了一个`新方法postMessage`用于给目标源发送信息，格式如下：`windowobj.postMessage(message,targetOrigin)`，而目标源会有一个叫`message`的事件用来监听`postMessage`，判断是允许的源所发来的数据后，就可以接收做处理。
+    * **hash方法**：`url→（协议+域名+端口+路径+查询字符串+片段标识符）`，其中片段标识符就是`hash`以`#`开头；因为同源策略不允许读写但可以引用，那么我在a中引入一个`iframe`（内联框架-另一个页面）且`src`指向`b.html`，此时的`src`是a页面输入的；然后我在b页面中用`location.hash`去修改自身`hash`也就是数据赋给`hash`，此时我再去`a`页面读取`iframe`的属性`src`，这个`src`就会被更新带有`hash`,处理后我就得到了`b`中的数据了。（此方法要注意`a`读取`src`的时机，要不停地去检测是否变化）
+→→（上面叙述有误，不能直接修改`location.hash`，被同源禁止，而是要在`b`中再新建一个指向`a.com`并且带有`b`中数据做`hash`的`代理iframe`，利用这个`代理iframe`与`a.com`同源的特性，再修改`父父页面`也就是`a.com`的`hash`，这样`a`读取`hash`就得到了数据，可参考最后一题实践截图，但基本原理是对的，就不改了）
+    * **window.name方法**：与`hash`方法类似，这个方法的核心是利用`window.name`不随域名改变而变化，只随`tab页面`的开启关闭而改变的特性。据此特性，我在`a页面`添加一个`iframe`，这个`iframe`指向`代理1页面`；代理1页面干两件事，把要传给b的数据命名为自己的`windowname`，修改自身`location.href`跳转到`b`；`b`读取`windowname`知道了`a`想要什么，就去数据库查，找到后把数据赋值给`windowname`，`location.href`跳转到`代理2页面`；代理2页面干两件事，读取windowname，用`window.parent.函数名`调用`父window(即a页面)`的函数；此时`a`页面提前定好的函数就`doing`啦，`a`啥也不干，就空想数据到来后怎么处理，然后插个`iframe`告诉`代理1`自己想要什么就可以坐等数据来了，人生赢家！
+
+#### jsonp 的原理
+* jsonp的原理：先串通好，你先把数据用括号包起来再加个名字，对就是json格式的数据带名字滴，像`data({xxx:'xxx',xxx:'xxx'})`这样，记得文件类型改成js；我利用可跨域引用的特点来引用你的js，定个函数起名就和那个数据名字一样，你那边的带名字的数据的js到了我这，咦你数据名和我函数名一样呢，很明显呐就变成一个赤裸裸的带参数的函数，不好意思我看到函数就执行啦，数据就被当成函数参数啦，一切都是套路。（正经的可以参考上一题的jsonp，因为有点重复就用更加通俗的语言来写一写，印象更深刻）
+
+#### CORS
+* Cross Origin Resource sharing 跨域资源共享，为了满足日益增长的跨域交互需求（折腾）W3C推荐了这种机制，它与我们用的ajax同源请求有什么区别么？有，多了一些组件、请求头等相关设置，但基本还是原来的配方，还是XMLHttpRequest这个对象，正常向有许可的网站发起ajax请求即可！现在它合法了只要对方允许你读取就可以。其实当你读取另一个站的资源时，浏览器就已经发起跨站请求了（现在基本新版浏览器都支持CORS，IE就不说了），只不过因为你没得到对方网站的允许（对方页面未声明你可以访问它），所以浏览器拦截了返回结果并只是告诉你，你不能跨域什么的，以上，可参考上一题。
+
+### 小练习
+#### 本地搭建服务器，演示同源策略
+* 修改了本地`host` 让多个网址映射到本地服务器
+* 我在`a.11.com`下用ajax向`11.com`发起请求 
+* 浏览器报错：提示XMLHttpRequest加载失败，请求我帮你发出去了，服务器也给我结果了，但是我在服务器的返回结果的头部没有发现‘请求控制允许源’这么一个东西（Tips：如果有那就是CORS啦），所以`a.11.com`你的访问是不被允许的。那么这就是同源策略，没有对方允许不能读写对方资源！
+![同源策略](http://upload-images.jianshu.io/upload_images/1826139-df19bca55b39e31c?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240) 
+
+#### 至少使用一种方式解决跨域问题
+* **降域**：我在`a.11.com`和`11.com`中都赋值`domain="11.com`;注意要两个页面都给`domain`赋值！！用`iframe`的方法。
+![降域](http://upload-images.jianshu.io/upload_images/1826139-345e50e8f367e2e4?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240) 
+* **jsonp**：把数据用json格式弄好包成js文件放在b.22.com，我在a中引用b中的js，并定义一个同名函数来打印数据。
+![jsonp](http://upload-images.jianshu.io/upload_images/1826139-de1aa919af199f8f?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240) 
+* **CORS**：这个简单，我在b.com加个声明，允许a.com来访问我，然后用ajax请求就OK！
+![CORS](http://upload-images.jianshu.io/upload_images/1826139-0cda233f08a4183c?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240) 
+* **[html5]postMessage**：我在a.com中用`iframe.contentWindow.postMessage('message',targetOrigin )`给b.com发送消息，在b.com中给window绑定监听事件，如果message触发我先判断是不是a发来的，是我就打印，搞定！
+![postMessage](http://upload-images.jianshu.io/upload_images/1826139-2aa92b99bcb30f24?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240) 
+* **hash方法**：hash方法的原理是a内嵌iframe指向b，b找到数据并新建一个和a.com同源的iframe而且把数据放在路径hash中，利用新建的iframe与a同源的特性修改父父页面也就是a页面的hash（把自己的hash赋给父父hash），a再去读取自身hash即可。
+![hash](http://upload-images.jianshu.io/upload_images/1826139-f9ac9a6803804dfb?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240) 
+a.com下的a.11.htm和代理proxy.htmll如下：
+
+
+     <p>我是a.11.com</p>
+     <iframe src="//b.22.com/test/b.22.html" frameborder="0"></iframe>
+    <script>
+      var data =location.hash.substring(1);
+      console.log(data);    
+    </script>
+
+    <p>我是a.com下的 proxy.html</p>
+    <p> 作用是代理</p>
+      <script>
+        parent.parent.location.hash=self.location.hash.substring(1);
+      </script>
+* **window.name方法**：tab页面不随域名跳转改变而改变，我先建一个内联iframe修改window.name跳转去b，b读取就知道我想要什么，然后b去找数据，找到后b把数据赋给window.name，再跳转回来，我读取winwod.name就得到数据。
+![window.name方法](http://upload-images.jianshu.io/upload_images/1826139-927285236df8420e?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240) 
+
+
+    <p>我是a.11.com</p>
+    <iframe src="//b.22.com/test/b.22.html" frameborder="0"></iframe>
+    <script src="http://apps.bdimg.com/libs/jquery/1.9.1/jquery.min.js"></script>
+    <script>
+      function print(data){
+        console.log(data);
+      }
+    </script>
+    <!-- //以下是 b.22.com 下的 b.22.html
+    <p>我是b.22.com</p>
+    <script>
+      window.name='这是来自b.com的数据';
+      location.href='//a.11.com/test/a.proxy.html';
+    </script> -->
+    
+    <!--   //以下是 a.11.com 下的 a.proxy.html
+    <p>我是a.com下的 proxy.html</p>
+    <p> 作用是代理</p>
+    <script>
+      window.parent.print(window.name);
+    </script> -->
